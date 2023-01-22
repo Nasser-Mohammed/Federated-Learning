@@ -1,4 +1,3 @@
-
 from torch import nn
 import copy
 from sklearn.metrics import confusion_matrix
@@ -8,15 +7,13 @@ from neuralnet import create_model
 import client
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 class Server:
-  def __init__(self, num_clients, num_rounds, client_list, data, device):
+  def __init__(self, num_clients, num_rounds, device, client_list, data, datasetName, model_type):
     self.num_clients = num_clients
     self.num_rounds = num_rounds
-    self.global_model = create_model().to(device)
+    self.device = device
+    self.global_model = create_model(model_type, datasetName).to(device)
     self.client_list = client_list
-    self.lf = nn.CrossEntropyLoss
     self.test_dl = data
     self.global_dict = None
 
@@ -26,11 +23,15 @@ class Server:
       string = "client " + str(i)
       cpy = client.Client(copy.deepcopy(self.global_model), i)
       self.client_list[string] = cpy
-    print(self.client_list)
+      #print(f"Initializing: {string}")
+    print("Clients initialized successfully")
 
   def push_new_model(self):
-    for index, client in enumerate(self.client_list):
-      self.client_list[client].model.load_state_dict(self.global_dict)
+    if self.global_dict == None:
+      print(f"global model is not initialized yet, cannot push new model")
+      return
+    for client in self.client_list.keys():
+      self.client_list[client].model.load_state_dict(copy.deepcopy(self.global_dict))
 
   def server_merge(self, nameList):
     self.global_dict = copy.deepcopy(self.global_model.state_dict())
@@ -40,7 +41,7 @@ class Server:
         summation += copy.deepcopy(self.client_list[client].model.state_dict()[layer])
       self.global_dict[layer] = summation/len(nameList)
 
-    self.global_model.load_state_dict(self.global_dict)
+    self.global_model.load_state_dict(copy.deepcopy(self.global_dict))
     self.push_new_model()
     # for person in self.client_list:
     #   self.client_list[person].model.load_state_dict(self.global_dict)
@@ -55,7 +56,7 @@ class Server:
       total = 0
       correct = 0
       for i, (image, label) in enumerate(self.test_dl[index]):
-        (image, label) = (image.to(device), label.to(device))
+        (image, label) = (image.to(self.device), label.to(self.device))
         prediction = self.global_model(image)
         total += prediction.size(0)
         correct += (prediction.argmax(1) == label).sum()
