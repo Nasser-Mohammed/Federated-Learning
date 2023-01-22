@@ -1,16 +1,14 @@
-
 import torch
 from torch import nn
 from torch import optim
+from numba import jit, cuda
+import numpy as np
 
 
 
-BATCH_SIZE = 32
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 lr = 0.001
 lf = nn.CrossEntropyLoss()
-
 
 class Client:
     def __init__(self, model, client_id):
@@ -18,10 +16,10 @@ class Client:
         self.client_id = client_id
         self.train_dl = None
         self.test_dl = None
-        self.epochs = 1
+        self.epochs = 5
         self.optimizer = optim.SGD(self.model.parameters(), lr)
 
-
+    
     def client_training(self):
         self.model.train()
         for e in range(0,self.epochs):
@@ -55,7 +53,7 @@ class Client:
 
             validationAccuracy = correct*100./total
             print(f"EPOCH {e+1}/{self.epochs} SUMMARY FOR CLIENT {self.client_id}:")
-            print(f"Validation Accuracy: {validationAccuracy}, and Train Accuracy is: {trainAccuracy}")
+            print(f"Train Accuracy: {trainAccuracy}%, and Validation Accuracy is {validationAccuracy}%")
             print("==============================================")
         
         return self.model.state_dict()
